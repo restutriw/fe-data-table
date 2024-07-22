@@ -2,31 +2,64 @@ import React, { useState, useEffect } from 'react';
 import { Container, Button, TextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 import axios from 'axios';
 
-const DataTable = () => {
+const KaryawanTable = () => {
   const [data, setData] = useState([]);
-  const [originalData, setOriginalData] = useState([]);
+  const [deletedIds, setDeletedIds] = useState([]);
 
   useEffect(() => {
-    // Fetch initial data from backend
     axios.get('http://localhost:8080/api/karyawan')
       .then(response => {
         setData(response.data);
-        setOriginalData(response.data);
       })
       .catch(error => console.error('Error fetching data:', error));
   }, []);
 
-  const handleSave = () => {
-    const updatedData = data.filter((row, index) => {
-      return JSON.stringify(row) !== JSON.stringify(originalData[index]);
-    });
+  const handleSave = async () => {
+    // Data yang baru ditambahin yang tanpa ID
+    const creates = data
+      .filter(row => !row.id)
+      .map(row => ({
+        nama: row.nama,
+        role: row.role,
+        status_pekerjaan: row.status_pekerjaan
+      }));
+    
+    // Update data
+    const updates = data
+      .filter(row => row.id) 
+      .map(row => ({
+        id: row.id,
+        karyawan: {
+          nama: row.nama,
+          role: row.role,
+          status_pekerjaan: row.status_pekerjaan
+        }
+      }));
+  
+    // Hapus data
+    const deletes = deletedIds;
+  
+    const bulkCRUDRequest = {
+      creates,
+      updates,
+      deletes
+    };
+  
+    console.log('Bulk CRUD Request:', bulkCRUDRequest);
+  
+    try {
+      const response = await axios.post('http://localhost:8080/api/karyawan/bulk-crud', bulkCRUDRequest);
+      console.log('Data saved successfully:', response.data);
+      setDeletedIds([]);
+    } catch (error) {
+      console.error('Error saving data:', error);
+    }
+  };
+  
 
-    axios.post('http://localhost:8080/api/karyawan/bulk-crud', updatedData)
-      .then(response => {
-        console.log('Data saved successfully:', response.data);
-        setOriginalData(data);
-      })
-      .catch(error => console.error('Error saving data:', error));
+  const handleDelete = (id) => {
+    setData(data.filter(row => row.id !== id));
+    setDeletedIds([...deletedIds, id]);
   };
 
   const handleChange = (index, field, value) => {
@@ -35,10 +68,17 @@ const DataTable = () => {
     setData(newData);
   };
 
+  const handleAddRow = () => {
+    setData([...data, { nama: '', role: '', status_pekerjaan: '' }]);
+  };
+
   return (
     <Container>
-      <Button onClick={handleSave} variant="contained" color="primary" style={{ marginBottom: '20px' }}>
+      <Button onClick={handleSave} variant="contained" color="primary" style={{ marginBottom: '20px', marginRight: '10px' }}>
         Simpan
+      </Button>
+      <Button onClick={handleAddRow} variant="contained" color="secondary" style={{ marginBottom: '20px' }}>
+        Tambah Data
       </Button>
       <TableContainer component={Paper}>
         <Table>
@@ -48,11 +88,12 @@ const DataTable = () => {
               <TableCell>Nama</TableCell>
               <TableCell>Role</TableCell>
               <TableCell>Status Pekerjaan</TableCell>
+              <TableCell>Aksi</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {data.map((row, index) => (
-              <TableRow key={row.id}>
+              <TableRow key={row.id || index}>
                 <TableCell>{row.id}</TableCell>
                 <TableCell>
                   <TextField
@@ -72,6 +113,9 @@ const DataTable = () => {
                     onChange={(e) => handleChange(index, 'status_pekerjaan', e.target.value)}
                   />
                 </TableCell>
+                <TableCell>
+                  <Button onClick={() => handleDelete(row.id)} color="secondary">Hapus</Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -81,4 +125,4 @@ const DataTable = () => {
   );
 };
 
-export default DataTable;
+export default KaryawanTable;
